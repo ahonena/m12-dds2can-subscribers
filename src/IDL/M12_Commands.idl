@@ -1,0 +1,7 @@
+struct M12_Commands{
+int16 tilt_velocity;
+int16 lift_velocity;
+int8 machine_velocity;
+int8 steering;
+boolean brakes_on;
+};
