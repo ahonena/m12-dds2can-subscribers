@@ -13,7 +13,7 @@ subprocess.call(['rm', '-rf', 'M12Typelib'])
 cmd = 'rtiddsgen'
 platform = 'x64Linux4gcc7.3.0'
 platform_arg = " -platform " + platform
-language = "C++11"
+language = "C"
 language_arg = " -language " + language
 update_arg = " -autoGenFiles " + platform
 #constructor_arg = " -constructor"

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10.2)
 
-project (commands_pub_and_sub)
+project (m12_dds2can)
 
 find_package(RTIConnextDDS REQUIRED
 HINTS ${CMAKE_SOURCE_DIR})
@@ -56,7 +56,8 @@ dl
 
 
 add_executable(subscribe_and_write2CAN
-${CMAKE_SOURCE_DIR}/src/subscribe_and_write2CAN.cpp
+${CMAKE_SOURCE_DIR}/src/subscribe_and_write2CAN.c
+${dds_typeobjs}
 )
 target_compile_definitions(subscribe_and_write2CAN PUBLIC
 -DRTI_UNIX -DRTI_LINUX -DRTI_64BIT
@@ -72,10 +73,10 @@ target_include_directories( subscribe_and_write2CAN PRIVATE
 )
 
 message(
-  "CONNEXTDDS_CPP2_API_LIBRARIES: ${CONNEXTDDS_CPP2_API_LIBRARIES_RELEASE_STATIC}"
+  "CONNEXTDDS_C_API_LIBRARIES: ${CONNEXTDDS_C_API_LIBRARIES_RELEASE_STATIC}"
 )
 target_link_libraries( subscribe_and_write2CAN PRIVATE
-  ${CONNEXTDDS_CPP2_API_LIBRARIES_RELEASE_STATIC}
+  ${CONNEXTDDS_C_API_LIBRARIES_RELEASE_STATIC}
   pthread
   dl
 )
