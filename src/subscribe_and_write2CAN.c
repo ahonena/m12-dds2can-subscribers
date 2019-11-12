@@ -4,12 +4,24 @@
 #include "M12_CommandsPlugin.h"
 #include "M12_CommandsSupport.h"
 #include "ndds/ndds_c.h"
+//#include "ndds/ndds_utility_c.h"
+
+#include <signal.h>
+#include <time.h>
 
 #define TRUE 1
 #define FALSE 0
-
+/*
+static volatile sig_atomic_t running = 1;
+static void interrupt_handler(int sig)
+{
+running = FALSE;
+}
+*/
 int main(){
 
+  /* ---------------------------------------------------------------------------*/
+  /* DDS initialization begin*/
   DDS_DomainParticipantFactory* factory = NULL;
   factory = DDS_DomainParticipantFactory_get_instance();
   if (factory == NULL) {
@@ -28,7 +40,7 @@ int main(){
   sizeof(NDDS_DISCOVERY_INITIAL_PEERS)/sizeof(const char*);
 
 
-  /* initialize participant_qos with default values */
+  // initialize participant_qos with default values
   retcode = DDS_DomainParticipantFactory_get_default_participant_qos(factory, &participant_qos);
   if (retcode != DDS_RETCODE_OK) {
     printf("***Error: failed to get default participant qos\n");
@@ -37,7 +49,7 @@ int main(){
     printf("***Error: failed to set discovery.initial_peers qos\n");
   }
 
-  /* Create the participant */
+  // Create the participant
   int domain_id = 0;
   participant =
   DDS_DomainParticipantFactory_create_participant(factory,domain_id,  &participant_qos,  NULL,DDS_STATUS_MASK_ALL);
@@ -48,7 +60,7 @@ int main(){
 
 
 
-  /* Create the subscriber */
+  // Create the subscriber
   struct DDS_SubscriberQos subscriber_qos = DDS_SubscriberQos_INITIALIZER;
   DDS_Subscriber* subscriber;
   struct DDS_SubscriberListener subscriber_listener = DDS_SubscriberListener_INITIALIZER;
@@ -62,7 +74,7 @@ int main(){
   }
 
 
-  /* Register and create the topic */
+  // Register and create the topic
   const char* type_name = "M12_Commands";
   retcode = M12_CommandsTypeSupport_register_type(participant, type_name);
   if (retcode != DDS_RETCODE_OK) {
@@ -83,11 +95,10 @@ int main(){
     printf("***Error: failed to create topic\n");
   }
 
-  /* Create the reader */
+  // Create the reader
   struct DDS_DataReaderQos reader_qos = DDS_DataReaderQos_INITIALIZER;
   DDS_DataReader* reader;
-  struct DDS_DataReaderListener reader_listener =
-  DDS_DataReaderListener_INITIALIZER;
+  struct DDS_DataReaderListener reader_listener = DDS_DataReaderListener_INITIALIZER;
   retcode = DDS_Subscriber_get_default_datareader_qos(  subscriber, &reader_qos);
   if (retcode != DDS_RETCODE_OK) {
     printf("***Error: failed to get default datareader qos\n");
@@ -98,48 +109,100 @@ int main(){
   }
 
 
-  /* Create the waitset and the condition for new messages */
+  //Create the waitset and the condition for new messages
   DDS_WaitSet* waitset = DDS_WaitSet_new();
+  //DDS_Condition* message_has_arrived = DDS_ReadCondition_as_condition(DDS_DataReader_create_readcondition(  reader,  DDS_NOT_READ_SAMPLE_STATE, DDS_NEW_VIEW_STATE, DDS_ANY_INSTANCE_STATE));
+  DDS_Condition* status_condition = DDS_Entity_get_statuscondition(reader);
+  DDS_StatusMask statusmask = DDS_DATA_AVAILABLE_STATUS;
 
+  retcode = DDS_StatusCondition_set_enabled_statuses(status_condition,  statusmask);
+  if (retcode != DDS_RETCODE_OK) {
+    printf("set_enabled_statuses error\n");
+    return -1;
+  }
 
-  /* DDS_NOT_READ_SAMPLE_STATE */
-  DDS_Condition* message_has_arrived = DDS_ReadCondition_as_condition(DDS_DataReader_create_readcondition(  reader,  DDS_NOT_READ_SAMPLE_STATE, DDS_ANY_VIEW_STATE, DDS_ANY_INSTANCE_STATE));
-
+  DDS_Condition* message_has_arrived = DDS_StatusCondition_as_condition (status_condition);
   retcode = DDS_WaitSet_attach_condition(waitset, message_has_arrived);
   if (retcode != DDS_RETCODE_OK) {
     printf("Could not attach condition to waitset...\n");
   }
 
-  struct DDS_Duration_t timeout = { 8*60*60, 1000000}; /* 8h */
-  struct DDS_ConditionSeq active_conditions = DDS_SEQUENCE_INITIALIZER; /* holder for active conditions */
+  struct DDS_Duration_t timeout = { 3, 0}; // wait for 3s if there are no messages
+
+  struct DDS_ConditionSeq active_conditions = DDS_SEQUENCE_INITIALIZER; // holder for active conditions
+
+  DDS_WaitSet_get_conditions 	(waitset,	&active_conditions );
+
   int has_message_arrived = FALSE;
+
+  //DDS_SampleStateMask   sample_state_mask = DDS_ANY_SAMPLE_STATE;
+  //DDS_ViewStateMask     view_state_mask = DDS_ANY_VIEW_STATE;
+  //DDS_InstanceStateMask instance_state_mask = DDS_ANY_INSTANCE_STATE;
+  struct M12_CommandsSeq data_seq = DDS_SEQUENCE_INITIALIZER;
+  struct DDS_SampleInfoSeq info_seq = DDS_SEQUENCE_INITIALIZER;
+
+  // DDS initialization end
+  /* ---------------------------------------------------------------------------*/
+
+
+
+
 
   //----------------------------------------------------------------------------
   // MAIN LOOP STARTS HERE
-  retcode = DDS_WaitSet_wait(waitset, &active_conditions, &timeout);
-  if (retcode != DDS_RETCODE_OK) {
-    /* ... check for cause of failure */
-  } else {
-    /* success */
-    if (DDS_ConditionSeq_get_length(&active_conditions) == 0) {
-      /* timeout! */
-      printf("Wait timed out!! None of the conditions was triggered.\n");
+  //signal(SIGINT, interrupt_handler);
+  struct timespec timer_start;
+  struct timespec timer_end;
+  int tmpcounter = 0;
+  while(tmpcounter < 10){
+    tmpcounter = tmpcounter + 1;
+    clock_gettime(CLOCK_REALTIME, &timer_start);
+
+    retcode = DDS_WaitSet_wait(waitset, &active_conditions, &timeout);
+
+
+
+
+    if (retcode != DDS_RETCODE_OK) {
+      printf("Problem with wait...\n");
     } else {
-      /* check if "cond1" or "cond2" are triggered: */
-      int i;
-      for(i = 0; i < DDS_ConditionSeq_get_length(&active_conditions); ++i) {
-        if (DDS_ConditionSeq_get(&active_conditions, i) == message_has_arrived) {
-          printf("Message has arrived!\n");
-          has_message_arrived = TRUE;
-        }
-        if (has_message_arrived) {
-          break;
-        }
+
+      printf("Data is available, accessing it...\n");
+      M12_Commands instance_;
+      retcode = M12_CommandsDataReader_take(reader, &data_seq, &info_seq, DDS_LENGTH_UNLIMITED, DDS_ANY_SAMPLE_STATE, DDS_ANY_VIEW_STATE, DDS_ANY_INSTANCE_STATE);
+      if (retcode != DDS_RETCODE_OK) {
+        printf("Could not take the instance from the datareader...\n");
+        return -1;
+        // success
+        //printf("Waitset ended...\n");
       }
+      retcode = M12_CommandsDataReader_return_loan(reader, &data_seq, &info_seq);
+      if (retcode != DDS_RETCODE_OK) {
+        printf("Could not return the loan...\n");
+        return -1;
+        // success
+        //printf("Waitset ended...\n");
+      }
+      /*
+      if (has_message_arrived) {
+      printf("Received a M12_Commands message...\n");
+      //---- DO STUFF HERE
+      */
+
+
     }
-  }
-  if (has_message_arrived) {
-    printf("Received a M12_Commands message...\n");
+
+
+
+
+    //----
+
+    clock_gettime(CLOCK_REALTIME, &timer_end);
+    //double seconds_elapsed = (double) timer_end.tv_sec -
+    double seconds_elapsed = (timer_end.tv_sec - timer_start.tv_sec) * 1e6 + (timer_end.tv_nsec - timer_start.tv_nsec) / 1e3;    // in microseconds
+    seconds_elapsed = seconds_elapsed/1e6;
+    //double time_used = (double) (timer_start.tv_sec-timer_start)/CLOCKS_PER_SEC;
+    printf("ELAPSED TIME IN MAIN LOOP: %f\n", seconds_elapsed);
   }
   // MAIN LOOP ENDS HERE
   //----------------------------------------------------------------------------
