@@ -264,7 +264,7 @@ int main(){
         printf("brakes_on: %i\n", data->brakes_on);
 
         // COB-ID of the command frame:
-        frame.can_id = 0x391;
+        frame.can_id = 0x187;
         frame.can_dlc = 8;
         //memcpy(&(frame.data),&(data->tilt_velocity), 2);
         //frame.data[0] = 0x1;
