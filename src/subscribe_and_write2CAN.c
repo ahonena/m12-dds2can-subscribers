@@ -9,6 +9,11 @@
 #include <signal.h>
 #include <time.h>
 #include <sys/mman.h>
+#include <linux/can.h>
+#include <linux/can/raw.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+
 #define TRUE 1
 #define FALSE 0
 
@@ -20,8 +25,13 @@ static void interrupt_handler(int sig)
 
 int main(){
 
+
+
+
   /* ---------------------------------------------------------------------------*/
-  /* DDS initialization begin*/
+  // DDS INITIALIZATION BEGIN
+  // Based on RTI Connext C api documentation
+
   DDS_DomainParticipantFactory* factory = NULL;
   factory = DDS_DomainParticipantFactory_get_instance();
   if (factory == NULL) {
@@ -141,8 +151,68 @@ int main(){
   struct M12_CommandsSeq data_seq = DDS_SEQUENCE_INITIALIZER;
   struct DDS_SampleInfoSeq info_seq = DDS_SEQUENCE_INITIALIZER;
 
-  // DDS initialization end
+  // DDS INITIALIZATION END
   /* ---------------------------------------------------------------------------*/
+
+
+
+
+
+
+
+
+
+/* ---------------------------------------------------------------------------*/
+// CAN INITIALIZATION BEGIN
+// Based on example found from:
+// https://www.can-cia.org/fileadmin/resources/documents/proceedings/2012_kleine-budde.pdf
+
+  struct ifreq ifr;
+  struct sockaddr_can addr;
+  struct can_frame frame;
+  int s;
+
+  memset(&ifr, 0x0, sizeof(ifr));
+  memset(&addr, 0x0, sizeof(addr));
+  memset(&frame, 0x0, sizeof(frame));
+
+  s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+
+  strcpy(ifr.ifr_name, "can0");
+  if(ioctl(s, SIOCGIFINDEX, &ifr)){
+    printf("ioctl went wrong...\n");
+  }
+
+  addr.can_ifindex = ifr.ifr_ifindex;
+  addr.can_family = PF_CAN;
+  if(bind(s, (struct sockaddr *)&addr, sizeof(addr))){
+    printf("bind went wrong...\n");
+  }
+
+  /*
+  frame.can_id = 0x23;
+  frame.can_dlc = 8;
+  frame.data[0] = 0x1;
+  frame.data[1] = 0x2;
+  frame.data[2] = 0x3;
+  frame.data[3] = 0x4;
+  frame.data[4] = 0x5;
+  frame.data[5] = 0x6;
+  frame.data[6] = 0x7;
+  frame.data[7] = 0x8;
+  */
+  //write(s, &frame, sizeof(frame));
+
+
+
+
+// CAN INITIALIZATION END
+/* ---------------------------------------------------------------------------*/
+
+
+
+
+
 
 
 
@@ -193,6 +263,37 @@ int main(){
         printf("steering: %i\n", data->steering);
         printf("brakes_on: %i\n", data->brakes_on);
 
+        // COB-ID of the command frame:
+        frame.can_id = 0x391;
+        frame.can_dlc = 8;
+        //memcpy(&(frame.data),&(data->tilt_velocity), 2);
+        //frame.data[0] = 0x1;
+        //frame.data[1] = 0x2;
+
+
+
+        frame.data[0] = data->tilt_velocity >> 8;
+        frame.data[1] = data->tilt_velocity & 0x00ff;
+        frame.data[2] = data->lift_velocity >> 8;
+        frame.data[3] = data->lift_velocity & 0x00ff;
+
+        //frame.data[4] = 0x0;
+
+        if(data->brakes_on){
+          frame.data[4] = 0x12;
+        }
+        else{
+          frame.data[4] = 0x11;
+        }
+
+
+        frame.data[5] = data->machine_velocity;
+        frame.data[6] = data->steering;
+        frame.data[7] = 0x0; // reserved
+
+        int how_much_written = write(s, &frame, sizeof(frame));
+        printf("Wrote %i", how_much_written);
+        printf(" bytes to can\n");
       }
 
         /* Note that depending on the info->sample_state
@@ -237,7 +338,7 @@ int main(){
 
 
 
-
+    close(s);
     printf("Closing down the DDS participant...\n");
 
 
