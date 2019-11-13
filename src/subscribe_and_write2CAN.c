@@ -203,7 +203,11 @@ int main(){
   */
   //write(s, &frame, sizeof(frame));
 
-
+  frame.can_id = 0x707;
+  frame.can_dlc = 1;
+  frame.data[0] = 0x00;
+  int how_much_written;
+  how_much_written = write(s, &frame, sizeof(frame));
 
 
 // CAN INITIALIZATION END
@@ -223,10 +227,11 @@ int main(){
   signal(SIGINT, interrupt_handler);
   struct timespec timer_start;
   struct timespec timer_end;
-  int tmpcounter = 0;
+
+  int loop_counter = 0;
   mlockall(MCL_CURRENT|MCL_FUTURE);
   while( running ){
-    tmpcounter = tmpcounter + 1;
+
     clock_gettime(CLOCK_REALTIME, &timer_start);
 
     retcode = DDS_WaitSet_wait(waitset, &active_conditions, &timeout);
@@ -248,6 +253,16 @@ int main(){
         return -1;
         // success
         //printf("Waitset ended...\n");
+      }
+
+      // CANopen heartbeat
+      if(loop_counter == 0 || (loop_counter % 3 == 0)){
+        frame.can_id = 0x707;
+        frame.can_dlc = 1;
+        frame.data[0] = 0x05;
+        how_much_written = write(s, &frame, sizeof(frame));
+        //printf("Wrote %i", how_much_written);
+        //printf(" bytes to can\n");
       }
 
       struct M12_Commands* data = NULL;
@@ -291,7 +306,7 @@ int main(){
         frame.data[6] = data->steering;
         frame.data[7] = 0x0; // reserved
 
-        int how_much_written = write(s, &frame, sizeof(frame));
+        how_much_written = write(s, &frame, sizeof(frame));
         printf("Wrote %i", how_much_written);
         printf(" bytes to can\n");
       }
@@ -330,6 +345,7 @@ int main(){
       seconds_elapsed = seconds_elapsed/1e6;
       //double time_used = (double) (timer_start.tv_sec-timer_start)/CLOCKS_PER_SEC;
       printf("ELAPSED TIME IN MAIN LOOP: %f\n", seconds_elapsed);
+      loop_counter = loop_counter + 1;
     }
     // MAIN LOOP ENDS HERE
     //----------------------------------------------------------------------------
