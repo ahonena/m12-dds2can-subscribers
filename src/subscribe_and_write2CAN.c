@@ -8,16 +8,16 @@
 
 #include <signal.h>
 #include <time.h>
-
+#include <sys/mman.h>
 #define TRUE 1
 #define FALSE 0
-/*
+
 static volatile sig_atomic_t running = 1;
 static void interrupt_handler(int sig)
 {
-running = FALSE;
+  running = FALSE;
 }
-*/
+
 int main(){
 
   /* ---------------------------------------------------------------------------*/
@@ -150,11 +150,12 @@ int main(){
 
   //----------------------------------------------------------------------------
   // MAIN LOOP STARTS HERE
-  //signal(SIGINT, interrupt_handler);
+  signal(SIGINT, interrupt_handler);
   struct timespec timer_start;
   struct timespec timer_end;
   int tmpcounter = 0;
-  while(tmpcounter < 10){
+  mlockall(MCL_CURRENT|MCL_FUTURE);
+  while( running ){
     tmpcounter = tmpcounter + 1;
     clock_gettime(CLOCK_REALTIME, &timer_start);
 
@@ -170,64 +171,89 @@ int main(){
       printf("Data is available, accessing it...\n");
       M12_Commands instance_;
       retcode = M12_CommandsDataReader_take(reader, &data_seq, &info_seq, DDS_LENGTH_UNLIMITED, DDS_ANY_SAMPLE_STATE, DDS_ANY_VIEW_STATE, DDS_ANY_INSTANCE_STATE);
+
+
       if (retcode != DDS_RETCODE_OK) {
         printf("Could not take the instance from the datareader...\n");
         return -1;
         // success
         //printf("Waitset ended...\n");
       }
-      retcode = M12_CommandsDataReader_return_loan(reader, &data_seq, &info_seq);
-      if (retcode != DDS_RETCODE_OK) {
-        printf("Could not return the loan...\n");
-        return -1;
-        // success
-        //printf("Waitset ended...\n");
+
+      struct M12_Commands* data = NULL;
+      struct DDS_SampleInfo* info = NULL;
+      int i;
+      for(i = 0; i <  M12_CommandsSeq_get_length(&data_seq); ++i) {
+        info = DDS_SampleInfoSeq_get_reference(&info_seq, i);
+        data = M12_CommandsSeq_get_reference(&data_seq, i);
+
+        printf("tilt_velocity: %i\n", data->tilt_velocity);
+        printf("lift_velocity: %i\n", data->lift_velocity);
+        printf("machine_velocity: %i\n", data->machine_velocity);
+        printf("steering: %i\n", data->steering);
+        printf("brakes_on: %i\n", data->brakes_on);
+
       }
-      /*
-      if (has_message_arrived) {
-      printf("Received a M12_Commands message...\n");
-      //---- DO STUFF HERE
-      */
 
-
-    }
+        /* Note that depending on the info->sample_state
+        it is possible that data will be NULL
+        */
 
 
 
 
-    //----
-
-    clock_gettime(CLOCK_REALTIME, &timer_end);
-    //double seconds_elapsed = (double) timer_end.tv_sec -
-    double seconds_elapsed = (timer_end.tv_sec - timer_start.tv_sec) * 1e6 + (timer_end.tv_nsec - timer_start.tv_nsec) / 1e3;    // in microseconds
-    seconds_elapsed = seconds_elapsed/1e6;
-    //double time_used = (double) (timer_start.tv_sec-timer_start)/CLOCKS_PER_SEC;
-    printf("ELAPSED TIME IN MAIN LOOP: %f\n", seconds_elapsed);
-  }
-  // MAIN LOOP ENDS HERE
-  //----------------------------------------------------------------------------
-
-
-
+        retcode = M12_CommandsDataReader_return_loan(reader, &data_seq, &info_seq);
+        if (retcode != DDS_RETCODE_OK) {
+          printf("Could not return the loan...\n");
+          return -1;
+          // success
+          //printf("Waitset ended...\n");
+        }
+        /*
+        if (has_message_arrived) {
+        printf("Received a M12_Commands message...\n");
+        //---- DO STUFF HERE
+        */
 
 
-
-  printf("Closing down the DDS participant...\n");
-
-
-  if (participant != NULL) {
-    retcode = DDS_DomainParticipant_delete_contained_entities(participant);
-    if (retcode != DDS_RETCODE_OK) {
-      fprintf(stderr, "delete_contained_entities error %d\n", retcode);
-    }
-    retcode = DDS_DomainParticipantFactory_delete_participant(
-      DDS_TheParticipantFactory, participant);
-      if (retcode != DDS_RETCODE_OK) {
-        fprintf(stderr, "delete_participant error %d\n", retcode);
       }
+
+
+
+
+      //----
+
+      clock_gettime(CLOCK_REALTIME, &timer_end);
+      //double seconds_elapsed = (double) timer_end.tv_sec -
+      double seconds_elapsed = (timer_end.tv_sec - timer_start.tv_sec) * 1e6 + (timer_end.tv_nsec - timer_start.tv_nsec) / 1e3;    // in microseconds
+      seconds_elapsed = seconds_elapsed/1e6;
+      //double time_used = (double) (timer_start.tv_sec-timer_start)/CLOCKS_PER_SEC;
+      printf("ELAPSED TIME IN MAIN LOOP: %f\n", seconds_elapsed);
     }
-    printf("Exiting...\n");
+    // MAIN LOOP ENDS HERE
+    //----------------------------------------------------------------------------
 
 
 
-  }
+
+
+
+    printf("Closing down the DDS participant...\n");
+
+
+    if (participant != NULL) {
+      retcode = DDS_DomainParticipant_delete_contained_entities(participant);
+      if (retcode != DDS_RETCODE_OK) {
+        fprintf(stderr, "delete_contained_entities error %d\n", retcode);
+      }
+      retcode = DDS_DomainParticipantFactory_delete_participant(
+        DDS_TheParticipantFactory, participant);
+        if (retcode != DDS_RETCODE_OK) {
+          fprintf(stderr, "delete_participant error %d\n", retcode);
+        }
+      }
+      printf("Exiting...\n");
+
+
+
+    }
