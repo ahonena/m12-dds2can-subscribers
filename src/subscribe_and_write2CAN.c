@@ -122,10 +122,10 @@ int main(){
   //Create the waitset and the condition for new messages
   DDS_WaitSet* waitset = DDS_WaitSet_new();
   //DDS_Condition* message_has_arrived = DDS_ReadCondition_as_condition(DDS_DataReader_create_readcondition(  reader,  DDS_NOT_READ_SAMPLE_STATE, DDS_NEW_VIEW_STATE, DDS_ANY_INSTANCE_STATE));
-  DDS_Condition* status_condition = DDS_Entity_get_statuscondition(reader);
+  DDS_Condition* status_condition = (DDS_Condition*)DDS_Entity_get_statuscondition((DDS_Entity*)reader);
   DDS_StatusMask statusmask = DDS_DATA_AVAILABLE_STATUS;
 
-  retcode = DDS_StatusCondition_set_enabled_statuses(status_condition,  statusmask);
+  retcode = DDS_StatusCondition_set_enabled_statuses((DDS_StatusCondition*)status_condition,  statusmask);
   if (retcode != DDS_RETCODE_OK) {
     printf("set_enabled_statuses error\n");
     return -1;
@@ -245,7 +245,7 @@ int main(){
 
       printf("Data is available, accessing it...\n");
       M12_Commands instance_;
-      retcode = M12_CommandsDataReader_take(reader, &data_seq, &info_seq, DDS_LENGTH_UNLIMITED, DDS_ANY_SAMPLE_STATE, DDS_ANY_VIEW_STATE, DDS_ANY_INSTANCE_STATE);
+      retcode = M12_CommandsDataReader_take( 	(M12_CommandsDataReader * )reader, &data_seq, &info_seq, DDS_LENGTH_UNLIMITED, DDS_ANY_SAMPLE_STATE, DDS_ANY_VIEW_STATE, DDS_ANY_INSTANCE_STATE);
 
 
       if (retcode != DDS_RETCODE_OK) {
@@ -318,7 +318,7 @@ int main(){
 
 
 
-        retcode = M12_CommandsDataReader_return_loan(reader, &data_seq, &info_seq);
+        retcode = M12_CommandsDataReader_return_loan((M12_CommandsDataReader*)reader, &data_seq, &info_seq);
         if (retcode != DDS_RETCODE_OK) {
           printf("Could not return the loan...\n");
           return -1;
