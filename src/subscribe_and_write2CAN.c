@@ -1,11 +1,10 @@
-#include <stdio.h>
-//#include "subscribe_and_write2CAN.hpp"
+
 #include "M12_Commands.h"
 #include "M12_CommandsPlugin.h"
 #include "M12_CommandsSupport.h"
 #include "ndds/ndds_c.h"
-//#include "ndds/ndds_utility_c.h"
 
+#include <stdio.h>
 #include <signal.h>
 #include <time.h>
 #include <sys/mman.h>
@@ -121,7 +120,6 @@ int main(){
 
   //Create the waitset and the condition for new messages
   DDS_WaitSet* waitset = DDS_WaitSet_new();
-  //DDS_Condition* message_has_arrived = DDS_ReadCondition_as_condition(DDS_DataReader_create_readcondition(  reader,  DDS_NOT_READ_SAMPLE_STATE, DDS_NEW_VIEW_STATE, DDS_ANY_INSTANCE_STATE));
   DDS_Condition* status_condition = (DDS_Condition*)DDS_Entity_get_statuscondition((DDS_Entity*)reader);
   DDS_StatusMask statusmask = DDS_DATA_AVAILABLE_STATUS;
 
@@ -145,21 +143,11 @@ int main(){
 
   int has_message_arrived = FALSE;
 
-  //DDS_SampleStateMask   sample_state_mask = DDS_ANY_SAMPLE_STATE;
-  //DDS_ViewStateMask     view_state_mask = DDS_ANY_VIEW_STATE;
-  //DDS_InstanceStateMask instance_state_mask = DDS_ANY_INSTANCE_STATE;
   struct M12_CommandsSeq data_seq = DDS_SEQUENCE_INITIALIZER;
   struct DDS_SampleInfoSeq info_seq = DDS_SEQUENCE_INITIALIZER;
 
   // DDS INITIALIZATION END
   /* ---------------------------------------------------------------------------*/
-
-
-
-
-
-
-
 
 
 /* ---------------------------------------------------------------------------*/
@@ -189,20 +177,6 @@ int main(){
     printf("bind went wrong...\n");
   }
 
-  /*
-  frame.can_id = 0x23;
-  frame.can_dlc = 8;
-  frame.data[0] = 0x1;
-  frame.data[1] = 0x2;
-  frame.data[2] = 0x3;
-  frame.data[3] = 0x4;
-  frame.data[4] = 0x5;
-  frame.data[5] = 0x6;
-  frame.data[6] = 0x7;
-  frame.data[7] = 0x8;
-  */
-  //write(s, &frame, sizeof(frame));
-
   frame.can_id = 0x707;
   frame.can_dlc = 1;
   frame.data[0] = 0x00;
@@ -212,10 +186,6 @@ int main(){
 
 // CAN INITIALIZATION END
 /* ---------------------------------------------------------------------------*/
-
-
-
-
 
 
 
@@ -251,8 +221,6 @@ int main(){
       if (retcode != DDS_RETCODE_OK) {
         printf("Could not take the instance from the datareader...\n");
         return -1;
-        // success
-        //printf("Waitset ended...\n");
       }
 
       // CANopen heartbeat
@@ -261,8 +229,6 @@ int main(){
         frame.can_dlc = 1;
         frame.data[0] = 0x05;
         how_much_written = write(s, &frame, sizeof(frame));
-        //printf("Wrote %i", how_much_written);
-        //printf(" bytes to can\n");
       }
 
       struct M12_Commands* data = NULL;
@@ -281,9 +247,7 @@ int main(){
         // COB-ID of the command frame:
         frame.can_id = 0x187;
         frame.can_dlc = 8;
-        //memcpy(&(frame.data),&(data->tilt_velocity), 2);
-        //frame.data[0] = 0x1;
-        //frame.data[1] = 0x2;
+
 
 
 
@@ -292,7 +256,6 @@ int main(){
         frame.data[2] = data->lift_velocity >> 8;
         frame.data[3] = data->lift_velocity & 0x00ff;
 
-        //frame.data[4] = 0x0;
 
         if(data->brakes_on){
           frame.data[4] = 0x12;
@@ -311,25 +274,12 @@ int main(){
         printf(" bytes to can\n");
       }
 
-        /* Note that depending on the info->sample_state
-        it is possible that data will be NULL
-        */
-
-
-
-
         retcode = M12_CommandsDataReader_return_loan((M12_CommandsDataReader*)reader, &data_seq, &info_seq);
         if (retcode != DDS_RETCODE_OK) {
           printf("Could not return the loan...\n");
           return -1;
-          // success
-          //printf("Waitset ended...\n");
+
         }
-        /*
-        if (has_message_arrived) {
-        printf("Received a M12_Commands message...\n");
-        //---- DO STUFF HERE
-        */
 
 
       }
@@ -340,10 +290,8 @@ int main(){
       //----
 
       clock_gettime(CLOCK_REALTIME, &timer_end);
-      //double seconds_elapsed = (double) timer_end.tv_sec -
       double seconds_elapsed = (timer_end.tv_sec - timer_start.tv_sec) * 1e6 + (timer_end.tv_nsec - timer_start.tv_nsec) / 1e3;    // in microseconds
       seconds_elapsed = seconds_elapsed/1e6;
-      //double time_used = (double) (timer_start.tv_sec-timer_start)/CLOCKS_PER_SEC;
       printf("ELAPSED TIME IN MAIN LOOP: %f\n", seconds_elapsed);
       loop_counter = loop_counter + 1;
     }
