@@ -1,4 +1,4 @@
-
+// Copyright: (c)  2020 Andrei Ahonen
 #include "M12_Commands.h"
 #include "M12_CommandsPlugin.h"
 #include "M12_CommandsSupport.h"
